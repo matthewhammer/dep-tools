@@ -156,6 +156,7 @@ fn dfs (graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeSet) {
     let mut divs:Vec<Div> = Vec::new();
     for n in stack.iter() {
         divs.push(dfs_rec(graph, &mut visited, n));
+        //if visited.len() > 10000 { break } else { continue }
     }
     (Div{tag:"dfs".to_string(),
          classes:vec![],         
@@ -163,10 +164,14 @@ fn dfs (graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeSet) {
          text: None}, visited)
 }
 
-fn append_classes_of_node(node:&Rc<String>, mut classes:Vec<String>) -> Vec<String> {
+fn cons_of_node_name(node:&Rc<String>) -> String {
     let cons : Vec<&str> = node.trim().split("(").collect();
     assert!(cons.len() > 0 && cons[0] != "");
-    classes.push(cons[0].to_string());
+    cons[0].to_string()
+}
+
+fn append_classes_of_node(node:&Rc<String>, mut classes:Vec<String>) -> Vec<String> {
+    classes.push(cons_of_node_name(node));
     classes
 }
 
@@ -174,7 +179,9 @@ fn append_tooltip(node:&Rc<String>, mut extent:Vec<Div>) -> Vec<Div> {
     extent.insert(0, Div{tag:"tooltip".to_string(), 
                          classes:vec![], 
                          extent:Box::new(vec![]),
-                         text:Some((**node).clone())});
+                         //text:Some((**node).clone())
+                         text:Some(cons_of_node_name(node)),
+    });
     extent
 }
 
@@ -187,7 +194,6 @@ fn dfs_rec (graph: &Graph, visited: &mut NodeSet, node:&Rc<String>) -> Div {
                 Div{tag:if false {(**node).clone()} else { "".to_string() },
                     classes:append_classes_of_node(node, vec![
                         "node".to_string(),
-                        "leaf".to_string(),
                         "no-extent".to_string()
                     ]),
                     extent:Box::new(append_tooltip(node, vec![])),
@@ -201,8 +207,7 @@ fn dfs_rec (graph: &Graph, visited: &mut NodeSet, node:&Rc<String>) -> Div {
                 }
                 Div{tag:if false {(**node).clone()} else { "".to_string() },
                     classes:append_classes_of_node(node, vec![
-                        "node".to_string(),
-                        "has-extent".to_string()
+                        "node".to_string()
                     ]),
                     extent:Box::new(append_tooltip(node, divs)),
                     text:None}
@@ -216,7 +221,8 @@ fn dfs_rec (graph: &Graph, visited: &mut NodeSet, node:&Rc<String>) -> Div {
                 "node".to_string(),
                 "visited".to_string()
             ],
-            extent:Box::new(append_tooltip(node, vec![])),
+            //extent:Box::new(append_tooltip(node, vec![])),
+            extent:Box::new(vec![]),
             text:None}
     }
 }
@@ -279,8 +285,6 @@ hr {
 }
 .tooltip {
   visibility: hidden;
-}
-.tooltip{
   background-color: #324;
   border-style: solid;
   border-color: #eeeeee;
@@ -293,14 +297,13 @@ hr {
   position: absolute;
   z-index: 1;
 }
-/*
 .node:hover {
   border-color: white;
 }
-*/
-.node:active > .tooltip {
+.node:hover > .tooltip {
   visibility: visible;
 }
+
 .WorkProduct {
   border-width: 3px;
   border-color: white;
@@ -311,6 +314,7 @@ hr {
   border-color: #000055;
   background: #0000ff;
 }
+
 .Hir {
   border-color: #005555;
   background: #00aaff;
