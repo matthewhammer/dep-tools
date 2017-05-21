@@ -1,0 +1,10 @@
+[package]
+name = "viz"
+version = "0.1.0"
+authors = ["Matthew Hammer <matthew.hammer@colorado.edu>"]
+
+[dependencies]
+dep-tools = { path = "../" }
+clap = "2"
+adapton = "0.3"
+adapton-lab = "0.1"

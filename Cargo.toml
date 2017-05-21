@@ -1,0 +1,8 @@
+[package]
+name = "dep-tools"
+version = "0.1.0"
+authors = ["Matthew Hammer <matthew.hammer@colorado.edu>"]
+
+[dependencies]
+adapton = "0.3"
+adapton-lab = "0.1"

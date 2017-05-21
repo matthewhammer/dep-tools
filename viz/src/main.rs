@@ -1,0 +1,321 @@
+extern crate clap;
+extern crate adapton_lab;
+
+use std::rc::Rc;
+use std::io::BufReader;
+use std::io::BufWriter;
+use std::io::Write;
+use std::io::BufRead;
+use std::fs::File;
+use std::collections::HashMap;
+
+use adapton_lab::labviz::{Div,WriteHTML};
+
+// Temp: Make this better at some point?
+type Graph = HashMap<Rc<String>, Vec<Rc<String>>>;
+type NodeSet = HashMap<Rc<String>,()>;
+
+struct St {
+    nodes: NodeSet,
+    leaves:NodeSet,
+    roots: NodeSet,
+    graph: Graph,
+    edges: Vec<(Rc<String>, Rc<String>)>,
+    rev_graph:Graph,
+}
+
+impl St {
+    fn new() -> Self {
+        St {            
+            nodes: HashMap::new(),
+            leaves:HashMap::new(),
+            roots: HashMap::new(),
+            graph: HashMap::new(),
+            edges: Vec::new(),
+            rev_graph:HashMap::new()
+        }
+    }
+    fn process_nodes(self:&mut Self) {
+        self.leaves=HashMap::new();
+        self.roots=HashMap::new();        
+        for (node,_) in self.nodes.iter() {
+            match self.graph.get(node) {
+                None => { self.leaves.insert(node.clone(),()); },
+                Some(_out) => {}
+            };
+            match self.rev_graph.get(node) {
+                None => { self.roots.insert(node.clone(),()); },
+                Some(_out) => {}
+            };
+        }
+    }
+    fn add_edge(self:&mut Self, src:Rc<String>, tgt:Rc<String>) {
+        self.nodes.insert(src.clone(), ());
+        self.nodes.insert(tgt.clone(), ());
+        let edge = if false {
+            //(Rc::new(v[0].to_string()), Rc::new(v[1].to_string()))
+            (src, tgt)
+        } else {
+            //(Rc::new(v[1].to_string()), Rc::new(v[0].to_string()))
+            (tgt, src)
+        };
+        self.edges.push(edge.clone());
+        
+        let inserted : bool = match self.graph.get_mut(&edge.0) {
+            None => { false }
+            Some(out) => {                
+                out.push(edge.1.clone()); 
+                true 
+            },
+        };
+        if !inserted {
+            self.graph.insert(edge.0.clone(), vec![ edge.1.clone() ]);
+        };
+
+        let inserted : bool = match self.rev_graph.get_mut(&edge.1) {
+            None => { false }
+            Some(out) => {                
+                out.push(edge.0.clone()); 
+                true 
+            },
+        };
+        if !inserted {
+            self.rev_graph.insert(edge.1, vec![ edge.0 ]);
+        };                
+    }
+}
+
+fn main() {
+  let args = clap::App::new("dep-viz")
+        .version("0.1")
+        .author("Matthew Hammer <matthew.hammer@colorado.edu>")
+        .about("Consumes Rustc dependency information; Produces visualizations")
+        .args_from_usage("\
+            -i, --infile=[infile]     'name for input file'
+            -o, --outfile=[outfile]   'name for output file'")
+    .get_matches();
+    let infile_name = args.value_of("infile").unwrap_or("dep_graph.txt");
+    let outfile_name = args.value_of("outfile").unwrap_or("dep_graph.html");
+    let f = File::open(infile_name).unwrap();
+    let file = BufReader::new(&f);    
+    let mut st = St::new();
+
+    println!("Reading input file: {}", infile_name);
+    for (num, line) in file.lines().enumerate() {
+        let line = line.unwrap();
+        let v: Vec<&str> = line.split(" -> ").map(|s|s.trim()).collect();
+        assert_eq!(v.len(), 2);
+        st.add_edge(Rc::new(v[0].to_string()), 
+                    Rc::new(v[1].to_string()));
+    }
+    println!("...Read input file: {}", infile_name);
+    st.process_nodes();
+    println!("  Found {} edges", st.edges.len());
+    println!("  Found {} nodes", st.nodes.len());
+    println!("    Found {} root nodes", st.roots.len());
+    println!("    Found {} leaf nodes", st.leaves.len());
+
+    println!("\nPerforming DFS on graph...");
+    let mut stack = vec![];
+    for (node,_) in st.roots.iter() {
+        stack.push(node.clone());
+        //break;
+    }
+
+    let (div, visited) = dfs(&st.graph, stack);
+    println!("...Performed DFS on graph.");
+    println!("  Visited {} nodes, {:.1}% of total", visited.len(), 
+             100f32 * (visited.len() as f32) / (st.nodes.len() as f32));
+
+    println!("\nFinding unvisited graph nodes...");
+    let mut unvisited : NodeSet = HashMap::new();
+    for (node, _) in st.nodes.iter() {
+        if visited.get(node) == None {
+            unvisited.insert(node.clone(), ());
+            //println!("unvisited: {}", node);
+        }
+    }
+    assert_eq!(visited.len() + unvisited.len(), 
+               st.nodes.len());
+    //println!("...Found graph nodes.");
+    println!("...Found {} unvisited graph nodes, {:.1}% of total.", 
+             unvisited.len(),              
+             100f32 * (unvisited.len() as f32) / (st.nodes.len() as f32));
+
+    let mut outfile = File::create(outfile_name).unwrap();    
+    let mut buf_writer = BufWriter::new(outfile);
+    buf_writer.write_all(style_string().as_bytes());
+    div.write_html(&mut buf_writer);
+    buf_writer.flush();
+}
+
+fn dfs (graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeSet) {
+    let mut visited:NodeSet = HashMap::new();
+    let mut divs:Vec<Div> = Vec::new();
+    for n in stack.iter() {
+        divs.push(dfs_rec(graph, &mut visited, n));
+    }
+    (Div{tag:"dfs".to_string(),
+         classes:vec![],         
+         extent:Box::new(divs),
+         text: None}, visited)
+}
+
+fn append_classes_of_node(node:&Rc<String>, mut classes:Vec<String>) -> Vec<String> {
+    let cons : Vec<&str> = node.trim().split("(").collect();
+    assert!(cons.len() > 0 && cons[0] != "");
+    classes.push(cons[0].to_string());
+    classes
+}
+
+fn append_tooltip(node:&Rc<String>, mut extent:Vec<Div>) -> Vec<Div> {
+    extent.insert(0, Div{tag:"tooltip".to_string(), 
+                         classes:vec![], 
+                         extent:Box::new(vec![]),
+                         text:Some((**node).clone())});
+    extent
+}
+
+fn dfs_rec (graph: &Graph, visited: &mut NodeSet, node:&Rc<String>) -> Div {
+    if visited.get(node) == None {
+        visited.insert(node.clone(),());
+        match graph.get(node) {
+            None => { 
+                /* Has no children */
+                Div{tag:if false {(**node).clone()} else { "".to_string() },
+                    classes:append_classes_of_node(node, vec![
+                        "node".to_string(),
+                        "leaf".to_string(),
+                        "no-extent".to_string()
+                    ]),
+                    extent:Box::new(append_tooltip(node, vec![])),
+                    text:None}
+            }
+            Some(out) => {
+                /* Has children */
+                let mut divs = vec![];
+                for n in out {
+                    divs.push(dfs_rec(graph, visited, n))
+                }
+                Div{tag:if false {(**node).clone()} else { "".to_string() },
+                    classes:append_classes_of_node(node, vec![
+                        "node".to_string(),
+                        "has-extent".to_string()
+                    ]),
+                    extent:Box::new(append_tooltip(node, divs)),
+                    text:None}
+            }
+        }
+    } 
+    else {
+        // Already visited
+        Div{tag:if false {(**node).clone()} else { "".to_string() },
+            classes:vec![
+                "node".to_string(),
+                "visited".to_string()
+            ],
+            extent:Box::new(append_tooltip(node, vec![])),
+            text:None}
+    }
+}
+
+pub fn style_string() -> &'static str {
+"
+<html>
+<head>
+<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js\"></script>
+
+<style>
+div { 
+  display: inline
+}
+body {
+  display: inline;
+  color: #aa88cc;
+  background: #552266;
+  font-family: sans-serif;
+  text-decoration: none;
+  padding: 0px;
+  margin: 0px;
+}
+body:visited {
+  color: #aa88cc;
+}
+a {
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+hr {
+  display: block;
+  float: left;
+  clear: both;
+  width: 0px;
+  border: none;
+}
+
+.node {
+  color: black;
+  display: inline-block;
+  border-style: solid;
+  border-color: #221133;
+  border-width: 1px;
+  background: #aa22ff;
+  font-size: 0px;
+  padding: 0px;
+  margin: 1px;
+  border-radius: 5px;
+}
+
+.visited {
+  border-width: 2px;
+}
+
+.no-extent {
+  padding: 3px;
+}
+.tooltip {
+  visibility: hidden;
+}
+/*
+.tooltip{
+  background-color: #324;
+  border-style: solid;
+  border-color: #eeeeee;
+  border-width: 1px;
+  color: #eae;
+  text-align: left;
+  padding: 5px 0;
+  border-radius: 2px;
+  font-size: 12px; 
+  position: absolute;
+  z-index: 1;
+}
+.node:hover {
+  border-color: white;
+}
+.node:hover > .tooltip {
+  visibility: visible;
+}
+*/
+.WorkProduct {
+  border-width: 3px;
+  border-color: white;
+  background: #999;
+}
+
+.MetaData {
+  border-color: #000055;
+  background: #0000ff;
+}
+.Hir {
+  border-color: #005555;
+  background: #00aaff;
+}
+
+</style>
+</head>
+<body>
+"
+}
