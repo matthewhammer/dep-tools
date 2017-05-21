@@ -142,11 +142,13 @@ fn main() {
              unvisited.len(),              
              100f32 * (unvisited.len() as f32) / (st.nodes.len() as f32));
 
+    println!("Writing HTML output: {}", outfile_name);
     let mut outfile = File::create(outfile_name).unwrap();    
     let mut buf_writer = BufWriter::new(outfile);
     buf_writer.write_all(style_string().as_bytes());
     div.write_html(&mut buf_writer);
     buf_writer.flush();
+    println!("..Wrote HTML output: {}", outfile_name);
 }
 
 fn dfs (graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeSet) {
@@ -278,7 +280,6 @@ hr {
 .tooltip {
   visibility: hidden;
 }
-/*
 .tooltip{
   background-color: #324;
   border-style: solid;
@@ -292,13 +293,14 @@ hr {
   position: absolute;
   z-index: 1;
 }
+/*
 .node:hover {
   border-color: white;
 }
-.node:hover > .tooltip {
+*/
+.node:active > .tooltip {
   visibility: visible;
 }
-*/
 .WorkProduct {
   border-width: 3px;
   border-color: white;
