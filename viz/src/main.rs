@@ -1,4 +1,4 @@
-#[macro_use] extern crate clap;
+extern crate clap;
 extern crate adapton_lab;
 
 use std::rc::Rc;
@@ -16,6 +16,7 @@ type Graph = HashMap<Rc<String>, Vec<Rc<String>>>;
 type NodeSet = HashMap<Rc<String>,()>;
 type NodeCount = HashMap<Rc<String>,usize>;
 
+#[derive(Debug)]
 struct Options {
     tooltips: bool,
     tooltips_visited: bool,
@@ -107,18 +108,23 @@ fn main() {
         .author("Matthew Hammer <matthew.hammer@colorado.edu>")
         .about("Consumes Rustc dependency information; Produces visualizations")
         .args_from_usage("\
-                --tooltips-visited    'show tooltips for visited nodes'
-            -i, --infile=[infile]     'name for input file'
-            -o, --outfile=[outfile]   'name for output file'")
+                --no-tips            'do not show tips for nodes on hover'
+                --tips-visited       'show tips even for visited nodes'
+            -i, --infile=[infile]    'name for input file'
+            -o, --outfile=[outfile]  'name for output file'")
     .get_matches();
     let infile_name = args.value_of("infile").unwrap_or("dep_graph.txt");
     let outfile_name = args.value_of("outfile").unwrap_or("dep_graph.html");
-    options.tooltips_visited = value_t!(args, "tooltips-visited", bool).unwrap_or(false);
+    
+    options.tooltips = !(args.is_present("no-tips"));
+    options.tooltips_visited = args.is_present("tips-visited");
+
+    println!("{:?}", options);
+    
+    println!("Reading input file: {}", infile_name);    
     let f = File::open(infile_name).unwrap();
     let file = BufReader::new(&f);    
     let mut st = St::new();
-
-    println!("Reading input file: {}", infile_name);
     for (_num, line) in file.lines().enumerate() {
         let line = line.unwrap();
         let v: Vec<&str> = line.split(" -> ").map(|s|s.trim()).collect();
