@@ -1,6 +1,7 @@
 extern crate clap;
 extern crate adapton_lab;
 
+use std::cmp::Ordering;
 use std::rc::Rc;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -15,6 +16,7 @@ use adapton_lab::labviz::{Div,WriteHTML};
 type Graph = HashMap<Rc<String>, Vec<Rc<String>>>;
 type NodeSet = HashMap<Rc<String>,()>;
 type NodeCount = HashMap<Rc<String>,usize>;
+type ConsCount = HashMap<Rc<String>,usize>;
 
 #[derive(Debug)]
 struct Options {
@@ -38,6 +40,7 @@ struct St {
     graph: Graph,
     edges: Vec<(Rc<String>, Rc<String>)>,
     rev_graph:Graph,
+    cons_count:ConsCount,
 }
 
 impl St {
@@ -48,13 +51,19 @@ impl St {
             roots: HashMap::new(),
             graph: HashMap::new(),
             edges: Vec::new(),
-            rev_graph:HashMap::new()
+            rev_graph:HashMap::new(),
+            cons_count:HashMap::new(),
         }
     }
     fn process_nodes(self:&mut Self) {
         self.leaves=HashMap::new();
-        self.roots=HashMap::new();        
+        self.roots=HashMap::new();    
         for (node,_) in self.nodes.iter() {
+
+            let cons = Rc::new(cons_of_node_name(&node));
+            let cons_count = (self.cons_count.get(&cons).unwrap_or(&0)).clone();
+            self.cons_count.insert(cons, cons_count + 1);
+            
             match self.graph.get(node) {
                 None => { self.leaves.insert(node.clone(),()); },
                 Some(_out) => {}
@@ -69,10 +78,8 @@ impl St {
         self.nodes.insert(src.clone(), ());
         self.nodes.insert(tgt.clone(), ());
         let edge = if false {
-            //(Rc::new(v[0].to_string()), Rc::new(v[1].to_string()))
             (src, tgt)
         } else {
-            //(Rc::new(v[1].to_string()), Rc::new(v[0].to_string()))
             (tgt, src)
         };
         self.edges.push(edge.clone());
@@ -111,7 +118,10 @@ fn main() {
                 --no-tips            'smaller HTML files: do not show tips for nodes on hover'
                 --tips-visited       'even larger HTML files: show tips even for visited nodes'
             -i, --infile=[infile]    'name for input file'
-            -o, --outfile=[outfile]  'name for output file'")
+            -o, --outfile=[outfile]  'name for output file'
+            -c, --countfile=[countfile]  'name for output file with DepNode constuctor counts'
+"
+        )
     .get_matches();
     let infile_name = args.value_of("infile").unwrap_or("dep_graph.txt");
     let outfile_name = args.value_of("outfile").unwrap_or("dep_graph.html");
@@ -139,11 +149,23 @@ fn main() {
     println!("    Found {} root nodes", st.roots.len());
     println!("    Found {} leaf nodes", st.leaves.len());
 
+    println!("\nCounting DepNode constructor frequencies...");
+    let count_outfile_name = args.value_of("countfile").unwrap_or("dep_graph.counts.txt");
+    let count_outfile = File::create(count_outfile_name).unwrap();
+    let mut buf_writer = BufWriter::new(count_outfile);
+    let mut counts = vec![];
+    for (cons,cons_count) in st.cons_count { counts.push((cons, cons_count)) }
+    counts.sort_by(|&(_,c1),&(_,c2)| if c1 <= c2 { Ordering::Less } else { Ordering::Greater } );
+    for (cons,cons_count) in counts {
+        let _ = write!(&mut buf_writer, "{:8} {}\n", cons_count, cons);
+    }
+    let _ = buf_writer.flush();    
+    println!("...Wrote DepNode constructor frequencies: {}", count_outfile_name);
+
     println!("\nPerforming DFS on graph...");
     let mut stack = vec![];
     for (node,_) in st.roots.iter() {
         stack.push(node.clone());
-        //break;
     }
 
     let (div, visited) = dfs(&options, &st.graph, stack);
@@ -157,13 +179,11 @@ fn main() {
         for (node, _) in st.nodes.iter() {
             if visited.get(node) == None {
                 unvisited.insert(node.clone(), ());
-                //println!("unvisited: {}", node);
             }
         }
         assert_eq!(visited.len() + unvisited.len(), 
                    st.nodes.len());
-        //println!("...Found graph nodes.");
-        println!("...Found {} unvisited graph nodes, {:.1}% of total.", 
+        println!("...Found {} unvisited graph nodes, {:.1}% of total nodes.", 
                  unvisited.len(),              
                  100f32 * (unvisited.len() as f32) / (st.nodes.len() as f32));
     }
@@ -174,7 +194,7 @@ fn main() {
     let _ = buf_writer.write_all(style_string().as_bytes());
     div.write_html(&mut buf_writer);
     let _ = buf_writer.flush();
-    println!("..Wrote HTML output: {}", outfile_name);
+    println!("..Wrote HTML output: {}", outfile_name);   
 }
 
 fn dfs (options:&Options, graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeCount) {
@@ -192,6 +212,8 @@ fn dfs (options:&Options, graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeCou
 
 fn cons_of_node_name(node:&Rc<String>) -> String {
     let cons : Vec<&str> = node.trim().split("(").collect();
+    assert!(cons.len() > 0 && cons[0] != "");
+    let cons : Vec<&str> = cons[0].trim().split("{").collect();
     assert!(cons.len() > 0 && cons[0] != "");
     cons[0].to_string()
 }
@@ -221,7 +243,10 @@ fn append_tooltip(options:&Options, node:&Rc<String>, mut extent:Vec<Div>, visit
     }
 }
 
-fn dfs_rec (options:&Options, graph: &Graph, visited: &mut NodeCount, depth:usize, node:&Rc<String>) -> Div {
+fn dfs_rec (options:&Options, graph: &Graph, 
+            visited: &mut NodeCount, 
+            depth:usize, node:&Rc<String>) -> Div 
+{
     if visited.get(node) == None {
         visited.insert(node.clone(),1);
         match graph.get(node) {
@@ -337,26 +362,65 @@ hr {
   z-index: 1;
 }
 .node:hover {
-  border-color: green;
+  border-color: white;
 }
 .node:hover > .tooltip {
   visibility: visible;
 }
 
+/* Very unique things
+Krate
+CoherenceOverlapCheck
+TypeckBodiesKrate
+LateLintCheck
+Reachability
+Coherence
+CrateVariances
+PrivacyAccessLevels
+AllLocalTraitImpls
+CoherenceCheckTrait
+ItemVarianceConstraints
+*/
+
+/* Less common things. */
+
 .WorkProduct {
-  border-width: 2px;
+  border-width: 3px;
   border-color: blue;
   background: #999;
 }
+.Hir {
+  border-width: 3px;
+  border-color: #005555;
+  background: #00aaff;
+}
+.Mir {
+  border-width: 3px;
+  border-color: #005555;
+  background: #00aaff;
+}
 
+/* Extremely common things */
+
+.ItemSignature {
+  border-color: #550000;
+  background: #ff0000;
+}
+.ItemAttrs {
+  border-color: #555500;
+  background: #ffff00;
+}
 .MetaData {
   border-color: #000055;
   background: #0000ff;
 }
-
-.Hir {
-  border-color: #005555;
-  background: #00aaff;
+.DefSpan {
+  border-color: #550055;
+  background: #ff00ff;
+}
+.SymbolName {
+  border-color: #555555;
+  background: #ffffff;
 }
 
 </style>
