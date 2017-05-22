@@ -20,6 +20,7 @@ type ConsCount = HashMap<Rc<String>,usize>;
 
 #[derive(Debug)]
 struct Options {
+    reverse: bool,
     tips: bool,
     tips_visited: bool,
 }
@@ -27,6 +28,7 @@ struct Options {
 impl Options {
     fn new() -> Self {
         Options {
+            reverse:false,
             tips:true,
             tips_visited:false,
         }
@@ -113,19 +115,21 @@ fn main() {
     let args = clap::App::new("dep-viz")
         .version("0.1")
         .author("Matthew Hammer <matthew.hammer@colorado.edu>")
-        .about("Consumes Rustc dependency information; Produces visualizations as HTML via a depth-first traversal.")
+        .about("Consumes Rustc dependency information; Produces visualizations as HTML via a depth-first traversal, from sinks to sources.")
         .args_from_usage("\
                 --no-tips            'smaller HTML files: do not show tips for nodes on hover'
                 --tips-visited       'even larger HTML files: show tips even for visited nodes'
             -i, --infile=[infile]    'name for input file'
             -o, --outfile=[outfile]  'name for output file'
             -c, --countfile=[countfile]  'name for output file with DepNode constuctor counts'
+            -r, --reverse            'search graph in reverse (sources to sinks)'
 "
         )
     .get_matches();
     let infile_name = args.value_of("infile").unwrap_or("dep_graph.txt");
     let outfile_name = args.value_of("outfile").unwrap_or("dep_graph.html");
-    
+
+    options.reverse = args.is_present("reverse");
     options.tips = !(args.is_present("no-tips"));
     options.tips_visited = args.is_present("tips-visited");
 
@@ -139,8 +143,14 @@ fn main() {
         let line = line.unwrap();
         let v: Vec<&str> = line.split(" -> ").map(|s|s.trim()).collect();
         assert_eq!(v.len(), 2);
-        st.add_edge(Rc::new(v[0].to_string()), 
-                    Rc::new(v[1].to_string()));
+        if options.reverse {
+            st.add_edge(Rc::new(v[1].to_string()), 
+                        Rc::new(v[0].to_string()));
+        }
+        else {
+            st.add_edge(Rc::new(v[0].to_string()), 
+                        Rc::new(v[1].to_string()));
+        }
     }
     println!("...Read input file: {}", infile_name);
     st.process_nodes();
@@ -370,19 +380,76 @@ hr {
   visibility: visible;
 }
 
-/* Very unique things
-Krate
-CoherenceOverlapCheck
-TypeckBodiesKrate
-LateLintCheck
-Reachability
-Coherence
-CrateVariances
-PrivacyAccessLevels
-AllLocalTraitImpls
-CoherenceCheckTrait
-ItemVarianceConstraints
+/* Very unique things:
+ - Krate
+ - CoherenceOverlapCheck
+ - TypeckBodiesKrate
+ - LateLintCheck
+ - Reachability
+ - Coherence
+ - CrateVariances
+ - PrivacyAccessLevels
+ - AllLocalTraitImpls
+ - CoherenceCheckTrait
+ - ItemVarianceConstraints
 */
+
+.Krate {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.CoherenceOverlapCheck {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.TypeckBodiesKrate {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.LateLintCheck {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.Reachability {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.Coherence {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.CrateVariances {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.PrivacyAccessLevels {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.AllLocalTraitImpls {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.CoherenceCheckTrait {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+.ItemVarianceConstraints {
+  border-width: 4px;
+  border-color: #0aa;
+  background: #0ff;
+}
+
 
 /* Less common things. */
 
