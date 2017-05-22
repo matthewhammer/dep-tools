@@ -254,10 +254,10 @@ fn dfs_rec (options:&Options, graph: &Graph, visited: &mut NodeCount, depth:usiz
         visited.insert(node.clone(), node_count);
         // Already visited
         Div{tag:if false {(**node).clone()} else { "".to_string() },
-            classes:vec![
+            classes:append_classes_of_node(node, vec![
                 "node".to_string(),
-                "visited".to_string()
-            ],
+                "visited".to_string()                    
+            ]),
             extent:Box::new(append_tooltip(options, node, vec![], true, depth)),
             //extent:Box::new(vec![]),
             text:None}
