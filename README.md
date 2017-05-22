@@ -41,6 +41,15 @@ much (_much!_) faster than graphviz!
 Viz tool
 ----------
 
+To visualize the dependency graph, we transform it to a tree via a
+depth-first search, and we output an HTML file.  This visualization
+approach has several benefits:
+
+1. Web browsers can render trees of `div`s very efficiently.
+2. Tree visualizations are more visually compact than graphs.
+
+**How to**:
+
 Follow the instructions above to generate a `dep_graph.txt` file.
 Given this file, you may generate a (large) HTML file from your
 dependency graph as follows:
