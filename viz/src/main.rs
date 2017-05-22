@@ -18,15 +18,15 @@ type NodeCount = HashMap<Rc<String>,usize>;
 
 #[derive(Debug)]
 struct Options {
-    tooltips: bool,
-    tooltips_visited: bool,
+    tips: bool,
+    tips_visited: bool,
 }
 
 impl Options {
     fn new() -> Self {
         Options {
-            tooltips:true,
-            tooltips_visited:false,
+            tips:true,
+            tips_visited:false,
         }
     }    
 }
@@ -116,10 +116,10 @@ fn main() {
     let infile_name = args.value_of("infile").unwrap_or("dep_graph.txt");
     let outfile_name = args.value_of("outfile").unwrap_or("dep_graph.html");
     
-    options.tooltips = !(args.is_present("no-tips"));
-    options.tooltips_visited = args.is_present("tips-visited");
+    options.tips = !(args.is_present("no-tips"));
+    options.tips_visited = args.is_present("tips-visited");
 
-    println!("{:?}", options);
+    println!("{:?}\n", options);
     
     println!("Reading input file: {}", infile_name);    
     let f = File::open(infile_name).unwrap();
@@ -151,22 +151,24 @@ fn main() {
     println!("  Visited {} nodes, {:.1}% of total", visited.len(), 
              100f32 * (visited.len() as f32) / (st.nodes.len() as f32));
 
-    println!("\nFinding unvisited graph nodes...");
-    let mut unvisited : NodeSet = HashMap::new();
-    for (node, _) in st.nodes.iter() {
-        if visited.get(node) == None {
-            unvisited.insert(node.clone(), ());
-            //println!("unvisited: {}", node);
+    if false {
+        println!("\nFinding unvisited graph nodes...");
+        let mut unvisited : NodeSet = HashMap::new();
+        for (node, _) in st.nodes.iter() {
+            if visited.get(node) == None {
+                unvisited.insert(node.clone(), ());
+                //println!("unvisited: {}", node);
+            }
         }
+        assert_eq!(visited.len() + unvisited.len(), 
+                   st.nodes.len());
+        //println!("...Found graph nodes.");
+        println!("...Found {} unvisited graph nodes, {:.1}% of total.", 
+                 unvisited.len(),              
+                 100f32 * (unvisited.len() as f32) / (st.nodes.len() as f32));
     }
-    assert_eq!(visited.len() + unvisited.len(), 
-               st.nodes.len());
-    //println!("...Found graph nodes.");
-    println!("...Found {} unvisited graph nodes, {:.1}% of total.", 
-             unvisited.len(),              
-             100f32 * (unvisited.len() as f32) / (st.nodes.len() as f32));
 
-    println!("Writing HTML output: {}", outfile_name);
+    println!("\nWriting HTML output: {}", outfile_name);
     let outfile = File::create(outfile_name).unwrap();    
     let mut buf_writer = BufWriter::new(outfile);
     let _ = buf_writer.write_all(style_string().as_bytes());
@@ -200,7 +202,7 @@ fn append_classes_of_node(node:&Rc<String>, mut classes:Vec<String>) -> Vec<Stri
 }
 
 fn append_tooltip(options:&Options, node:&Rc<String>, mut extent:Vec<Div>, visited:bool, depth: usize) -> Vec<Div> {
-    if options.tooltips && (!visited || options.tooltips_visited) {
+    if options.tips && (!visited || options.tips_visited) {
         let show_full_details_depth = 2;
         extent.insert(0, Div{tag:"tooltip".to_string(), 
                              classes:vec![], 
