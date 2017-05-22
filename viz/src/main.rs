@@ -1,4 +1,4 @@
-extern crate clap;
+#[macro_use] extern crate clap;
 extern crate adapton_lab;
 
 use std::rc::Rc;
@@ -14,6 +14,21 @@ use adapton_lab::labviz::{Div,WriteHTML};
 // Temp: Make this better at some point?
 type Graph = HashMap<Rc<String>, Vec<Rc<String>>>;
 type NodeSet = HashMap<Rc<String>,()>;
+type NodeCount = HashMap<Rc<String>,usize>;
+
+struct Options {
+    tooltips: bool,
+    tooltips_visited: bool,
+}
+
+impl Options {
+    fn new() -> Self {
+        Options {
+            tooltips:true,
+            tooltips_visited:false,
+        }
+    }    
+}
 
 struct St {
     nodes: NodeSet,
@@ -86,22 +101,25 @@ impl St {
 }
 
 fn main() {
-  let args = clap::App::new("dep-viz")
+    let mut options = Options::new();
+    let args = clap::App::new("dep-viz")
         .version("0.1")
         .author("Matthew Hammer <matthew.hammer@colorado.edu>")
         .about("Consumes Rustc dependency information; Produces visualizations")
         .args_from_usage("\
+                --tooltips-visited    'show tooltips for visited nodes'
             -i, --infile=[infile]     'name for input file'
             -o, --outfile=[outfile]   'name for output file'")
     .get_matches();
     let infile_name = args.value_of("infile").unwrap_or("dep_graph.txt");
     let outfile_name = args.value_of("outfile").unwrap_or("dep_graph.html");
+    options.tooltips_visited = value_t!(args, "tooltips-visited", bool).unwrap_or(false);
     let f = File::open(infile_name).unwrap();
     let file = BufReader::new(&f);    
     let mut st = St::new();
 
     println!("Reading input file: {}", infile_name);
-    for (num, line) in file.lines().enumerate() {
+    for (_num, line) in file.lines().enumerate() {
         let line = line.unwrap();
         let v: Vec<&str> = line.split(" -> ").map(|s|s.trim()).collect();
         assert_eq!(v.len(), 2);
@@ -122,7 +140,7 @@ fn main() {
         //break;
     }
 
-    let (div, visited) = dfs(&st.graph, stack);
+    let (div, visited) = dfs(&options, &st.graph, stack);
     println!("...Performed DFS on graph.");
     println!("  Visited {} nodes, {:.1}% of total", visited.len(), 
              100f32 * (visited.len() as f32) / (st.nodes.len() as f32));
@@ -143,19 +161,19 @@ fn main() {
              100f32 * (unvisited.len() as f32) / (st.nodes.len() as f32));
 
     println!("Writing HTML output: {}", outfile_name);
-    let mut outfile = File::create(outfile_name).unwrap();    
+    let outfile = File::create(outfile_name).unwrap();    
     let mut buf_writer = BufWriter::new(outfile);
-    buf_writer.write_all(style_string().as_bytes());
+    let _ = buf_writer.write_all(style_string().as_bytes());
     div.write_html(&mut buf_writer);
-    buf_writer.flush();
+    let _ = buf_writer.flush();
     println!("..Wrote HTML output: {}", outfile_name);
 }
 
-fn dfs (graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeSet) {
-    let mut visited:NodeSet = HashMap::new();
+fn dfs (options:&Options, graph: &Graph, stack:Vec<Rc<String>>) -> (Div, NodeCount) {
+    let mut visited:NodeCount = HashMap::new();
     let mut divs:Vec<Div> = Vec::new();
     for n in stack.iter() {
-        divs.push(dfs_rec(graph, &mut visited, n));
+        divs.push(dfs_rec(options, graph, &mut visited, 0, n));
         //if visited.len() > 10000 { break } else { continue }
     }
     (Div{tag:"dfs".to_string(),
@@ -175,19 +193,29 @@ fn append_classes_of_node(node:&Rc<String>, mut classes:Vec<String>) -> Vec<Stri
     classes
 }
 
-fn append_tooltip(node:&Rc<String>, mut extent:Vec<Div>) -> Vec<Div> {
-    extent.insert(0, Div{tag:"tooltip".to_string(), 
-                         classes:vec![], 
-                         extent:Box::new(vec![]),
-                         //text:Some((**node).clone())
-                         text:Some(cons_of_node_name(node)),
-    });
-    extent
+fn append_tooltip(options:&Options, node:&Rc<String>, mut extent:Vec<Div>, visited:bool, depth: usize) -> Vec<Div> {
+    if options.tooltips && (!visited || options.tooltips_visited) {
+        let show_full_details_depth = 2;
+        extent.insert(0, Div{tag:"tooltip".to_string(), 
+                             classes:vec![], 
+                             extent:Box::new(vec![]),
+                             text: Some(
+                                 format!("{}: {}", depth, 
+                                         if !visited && depth < show_full_details_depth
+                                         { (**node).clone() } 
+                                         else 
+                                         { cons_of_node_name(node) }))
+        });
+        extent
+    }
+    else {
+        extent 
+    }
 }
 
-fn dfs_rec (graph: &Graph, visited: &mut NodeSet, node:&Rc<String>) -> Div {
+fn dfs_rec (options:&Options, graph: &Graph, visited: &mut NodeCount, depth:usize, node:&Rc<String>) -> Div {
     if visited.get(node) == None {
-        visited.insert(node.clone(),());
+        visited.insert(node.clone(),1);
         match graph.get(node) {
             None => { 
                 /* Has no children */
@@ -196,33 +224,36 @@ fn dfs_rec (graph: &Graph, visited: &mut NodeSet, node:&Rc<String>) -> Div {
                         "node".to_string(),
                         "no-extent".to_string()
                     ]),
-                    extent:Box::new(append_tooltip(node, vec![])),
+                    extent:Box::new(append_tooltip(options, node, vec![], false, depth)),
                     text:None}
             }
             Some(out) => {
                 /* Has children */
                 let mut divs = vec![];
                 for n in out {
-                    divs.push(dfs_rec(graph, visited, n))
+                    divs.push(dfs_rec(options, graph, visited, depth+1, n))
                 }
                 Div{tag:if false {(**node).clone()} else { "".to_string() },
                     classes:append_classes_of_node(node, vec![
                         "node".to_string()
                     ]),
-                    extent:Box::new(append_tooltip(node, divs)),
+                    extent:Box::new(append_tooltip(options, node, divs, false, depth)),
                     text:None}
             }
         }
     } 
     else {
+        // increment counter
+        let node_count = visited.get(node).unwrap() + 1;
+        visited.insert(node.clone(), node_count);
         // Already visited
         Div{tag:if false {(**node).clone()} else { "".to_string() },
             classes:vec![
                 "node".to_string(),
                 "visited".to_string()
             ],
-            //extent:Box::new(append_tooltip(node, vec![])),
-            extent:Box::new(vec![]),
+            extent:Box::new(append_tooltip(options, node, vec![], true, depth)),
+            //extent:Box::new(vec![]),
             text:None}
     }
 }
@@ -240,7 +271,7 @@ div {
 body {
   display: inline;
   color: #aa88cc;
-  background: #552266;
+  background: #313;
   font-family: sans-serif;
   text-decoration: none;
   padding: 0px;
@@ -269,7 +300,7 @@ hr {
   border-style: solid;
   border-color: #221133;
   border-width: 1px;
-  background: #aa22ff;
+  background: #ffccff;
   font-size: 0px;
   padding: 0px;
   margin: 1px;
@@ -298,15 +329,15 @@ hr {
   z-index: 1;
 }
 .node:hover {
-  border-color: white;
+  border-color: green;
 }
 .node:hover > .tooltip {
   visibility: visible;
 }
 
 .WorkProduct {
-  border-width: 3px;
-  border-color: white;
+  border-width: 2px;
+  border-color: blue;
   background: #999;
 }
 
