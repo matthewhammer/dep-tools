@@ -108,7 +108,7 @@ fn main() {
         .author("Matthew Hammer <matthew.hammer@colorado.edu>")
         .about("Consumes Rustc dependency information; Produces visualizations as HTML via a depth-first traversal.")
         .args_from_usage("\
-                --no-tips            'smaller HTML files: do not showing tips for nodes on hover'
+                --no-tips            'smaller HTML files: do not show tips for nodes on hover'
                 --tips-visited       'even larger HTML files: show tips even for visited nodes'
             -i, --infile=[infile]    'name for input file'
             -o, --outfile=[outfile]  'name for output file'")
