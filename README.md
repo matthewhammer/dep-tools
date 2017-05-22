@@ -25,16 +25,18 @@ me:
     Finished dev [unoptimized + debuginfo] target(s) in 5.45 secs
 ```
 
-To this invocation, prepend two additional options, `-Z incremental`
+To this `rustc` invocation, prepend two additional options, `-Z incremental=true`
 and `-Z dump-dep-graph`:
 
 ```
-rustc -Z incremental -Z dump-dep-graph ...
+rustc -Z incremental=true -Z dump-dep-graph ...stuff from above...
 ```
 
-eNow, you should have a file called `dep-graph.txt`.  Likely, it is
-_very_ large.  That's okay!  Our visualization tool can process large
-files quickly, much (_much!_) faster than graphviz!
+Now, you should have a file called `dep-graph.txt`.  Likely, it is
+_very_ large (e.g., mine is 83M).  
+
+That's okay!  Our visualization tool can process large files quickly,
+much (_much!_) faster than graphviz!
 
 Viz tool
 ----------
