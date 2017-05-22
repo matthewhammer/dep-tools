@@ -156,20 +156,22 @@ fn main() {
     let mut counts = vec![];
     for (cons,cons_count) in st.cons_count { counts.push((cons, cons_count)) }
     counts.sort_by(|&(_,c1),&(_,c2)| if c1 <= c2 { Ordering::Less } else { Ordering::Greater } );
+    let counts_len = counts.len();
     for (cons,cons_count) in counts {
         let _ = write!(&mut buf_writer, "{:8} {}\n", cons_count, cons);
     }
     let _ = buf_writer.flush();    
     println!("...Wrote DepNode constructor frequencies: {}", count_outfile_name);
+    println!("  Found {} distinct node constructors; Each becomes a CSS class in HTML output.", counts_len);
 
-    println!("\nPerforming DFS on graph...");
+    println!("\nTraversing graph (DFS)...");
     let mut stack = vec![];
     for (node,_) in st.roots.iter() {
         stack.push(node.clone());
     }
 
     let (div, visited) = dfs(&options, &st.graph, stack);
-    println!("...Performed DFS on graph.");
+    println!("...Traversed graph.");
     println!("  Visited {} nodes, {:.1}% of total", visited.len(), 
              100f32 * (visited.len() as f32) / (st.nodes.len() as f32));
 
