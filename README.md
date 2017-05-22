@@ -35,7 +35,6 @@ Viz tool
 ----------
 
 **Quick how-to**:
-
 Follow the instructions above to generate a `dep_graph.txt` file.
 Given this file, you may generate a (large) HTML file from your
 dependency graph as follows:
@@ -46,7 +45,6 @@ cargo run --release -- -i path-to-dep-graph.txt
 ```
 
 **Explanation of HTML output**:
-
 To visualize the dependency graph, we first transform this graph into
 a tree via a depth-first search, and we render this traversal as an
 HTML file.  This DFS-tree-based visualization approach has several
@@ -57,7 +55,8 @@ benefits:
 
 2. Tree-based visualizations are more visually compact than
    graph-based visualizations (cf, the utility of running `graphviz`
-   on the output).
+   on the output and opening in an image viewer; I do not recommend
+   actually trying this).
 
 However, there are downsides too:
 
