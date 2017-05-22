@@ -47,5 +47,5 @@ dependency graph as follows:
 
 ```
 cd viz
-cargo run -- -i path-to-dep-graph.txt
+cargo run --release -- -i path-to-dep-graph.txt
 ```
