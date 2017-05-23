@@ -10,12 +10,15 @@ Dump a graph with `cargo rustc`
 
 Use the `rustc` subcommand of `cargo` to pass some additional
 debugging flags, through `cargo`, to its `rustc` invocations.  In
-particular, use two additional options, `-Z incremental=true` and `-Z
+particular, use two additional options, `-Z incremental=somedir` and `-Z
 dump-dep-graph`, as follows:
 
 ```
-cargo rustc -- -Z incremental=true -Z dump-dep-graph
+cargo rustc -- -Z incremental=somedir -Z dump-dep-graph
 ```
+
+The compiler will use path `somedir` to hold the incremental
+compilation cache.
 
 **Verbose mode**: Optionally, if you want to see how cargo invokes
 `rustc`, just include `-v` before the `--`:
