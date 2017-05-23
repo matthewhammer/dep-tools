@@ -24,7 +24,7 @@ compilation cache.
 `rustc`, just include `-v` before the `--`:
 
 ```
-cargo rustc -v -- -Z incremental=true -Z dump-dep-graph
+cargo rustc -v -- -Z incremental=somedir -Z dump-dep-graph
 ```
 
 Now, you should have a file called `dep-graph.txt`.  Likely, it is
